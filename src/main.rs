@@ -2,13 +2,13 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::{env, fs};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug)]
 struct Source {
     name: String,
     dir: String,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug)]
 #[allow(dead_code)]
 struct Include {
     name: String,
@@ -64,9 +64,16 @@ impl Database {
     fn get_includes(&mut self) -> &Vec<Include> {
         &self.includes
     }
-    fn sort(&mut self) {
-        let _ = &self.sources.sort();
-        let _ = &self.includes.sort();
+    fn sort_name(&mut self) {
+        let _ = &self
+            .sources
+            .sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.dir.cmp(&b.dir)));
+        let _ = &self
+            .includes
+            .sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.dir.cmp(&b.dir)));
+    }
+    fn sort_incs_dir(&mut self) {
+        let _ = &self.includes.sort_by(|a, b| a.dir.cmp(&b.dir));
     }
 }
 
@@ -146,29 +153,31 @@ fn main() {
         process::exit(0);
     }
 
+    /* get the includes' dirs */
+    data.sort_incs_dir();
+    let mut incs_dir = String::new();
+    let mut pre = "";
+
+    for i in data.get_includes() {
+        if i.dir != pre {
+            incs_dir += format!("      \"-I{}\",\r\n", i.dir).as_str();
+        }
+        pre = i.dir.as_str();
+    }
+
     /* root_dir */
-    let mut root = String::from("    \"directory\": \"");
-    root += data.get_root();
-    root += "\",\r\n";
+    let root = String::from(format!("    \"directory\": \"{}\",\r\n", data.get_root()));
 
     /* args */
     let mut args = String::from("    \"arguments\": [\r\n");
     for a in data.get_args() {
-        args += "      \"";
-        args += a;
-        args += "\",\r\n";
+        args += format!("      \"{}\",\r\n", a).as_str();
     }
-    for i in data.get_includes() {
-        args += "      \"";
-        args += "-I";
-        args += i.dir.as_str();
-        args += "\",\r\n";
-    }
+    args += &incs_dir;
     args.pop();
     args.pop();
     args.pop();
-    args += "\r\n";
-    args += "    ],\r\n";
+    args += "\r\n    ],\r\n";
 
     /* all the datas */
     let separator;
@@ -180,19 +189,15 @@ fn main() {
     {
         separator = "\\";
     }
-    let mut datas = String::new();
+
     /* begin */
-    datas += "[\r\n";
+    let mut datas = String::from("[\r\n");
 
     for s in data.get_sources() {
         datas += "  {\r\n";
         datas += root.as_str();
         datas += args.as_str();
-        datas += "    \"file\": \"";
-        datas += s.dir.as_str();
-        datas += separator;
-        datas += s.name.as_str();
-        datas += "\"\r\n";
+        datas += format!("    \"file\": \"{}{}{}\"\r\n", s.dir, separator, s.name).as_str();
         datas += "  },\r\n";
     }
     datas.pop();
@@ -213,7 +218,7 @@ fn main() {
     }
 
     /* print the duplicate datas */
-    data.sort();
+    data.sort_name();
     let mut flag_start = true;
     let mut flag_dup = false;
     let mut pre_name = "";
