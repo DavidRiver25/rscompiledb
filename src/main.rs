@@ -77,6 +77,10 @@ impl Database {
     }
 }
 
+fn uinx_dir(dir: String) -> String {
+    dir.replace("\\", "/")
+}
+
 fn recursive_search(dir: PathBuf, base: &mut Database) {
     let dir_name = dir.to_str().expect("fail to parse directory").to_string();
 
@@ -89,7 +93,7 @@ fn recursive_search(dir: PathBuf, base: &mut Database) {
                     recursive_search(path, base);
                 } else if name.ends_with(".h") {
                     base.push_include(Include {
-                        dir: dir_name.clone(),
+                        dir: uinx_dir(dir_name.clone()),
                         name: name.into(),
                     });
                 } else if name.ends_with(match base.get_type() {
@@ -98,7 +102,7 @@ fn recursive_search(dir: PathBuf, base: &mut Database) {
                     _ => "can't be this",
                 }) {
                     base.push_source(Source {
-                        dir: dir_name.clone(),
+                        dir: uinx_dir(dir_name.clone()),
                         name: name.into(),
                     });
                 }
@@ -113,12 +117,12 @@ fn main() {
 
     let mut data = Database::new();
     /* root */
-    data.set_root(
+    data.set_root(uinx_dir(
         root.clone()
             .into_os_string()
             .into_string()
             .expect("fail to parse os string"),
-    );
+    ));
     /* args_1 must be "c" or "cpp", then if there are additional args, must use -a */
     let mut args = args.skip(1).collect::<Vec<String>>();
     if args.is_empty() {
@@ -166,7 +170,7 @@ fn main() {
     }
 
     /* root_dir */
-    let root = String::from(format!("    \"directory\": \"{}\",\r\n", data.get_root()));
+    let root = format!("    \"directory\": \"{}\",\r\n", data.get_root());
 
     /* args */
     let mut args = String::from("    \"arguments\": [\r\n");
@@ -180,15 +184,7 @@ fn main() {
     args += "\r\n    ],\r\n";
 
     /* all the datas */
-    let separator;
-    #[cfg(unix)]
-    {
-        separator = "/";
-    }
-    #[cfg(windows)]
-    {
-        separator = "\\";
-    }
+    let separator = "/";
 
     /* begin */
     let mut datas = String::from("[\r\n");
