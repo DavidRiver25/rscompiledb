@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::{env, fs};
@@ -159,14 +160,10 @@ fn main() {
 
     /* get the includes' dirs */
     data.sort_incs_dir();
+    let grouped_inc_dirs = data.get_includes().iter().group_by(|&x| &x.dir);
     let mut incs_dir = String::new();
-    let mut pre = "";
-
-    for i in data.get_includes() {
-        if i.dir != pre {
-            incs_dir += format!("      \"-I{}\",\r\n", i.dir).as_str();
-        }
-        pre = i.dir.as_str();
+    for (d, _g) in grouped_inc_dirs.into_iter() {
+        incs_dir += format!("      \"-I{}\",\r\n", d).as_str();
     }
 
     /* root_dir */
@@ -215,51 +212,29 @@ fn main() {
 
     /* print the duplicate datas */
     data.sort_name();
+
     let mut flag_start = true;
-    let mut flag_dup = false;
-    let mut pre_name = "";
-    let mut pre_dir = "";
 
-    let incs = data.get_includes();
-    for i in incs {
-        if pre_name == i.name {
+    for (_, group) in &data.get_includes().iter().group_by(|&x| &x.name) {
+        let item: Vec<_> = group.collect();
+        if item.len() > 1 {
             if flag_start {
                 flag_start = false;
-                println!("duplicate files:");
+                println!("duplicate includes:");
             }
-            println!("header: {}", pre_dir.to_string() + separator + pre_name);
-            flag_dup = true;
-        } else if flag_dup {
-            flag_dup = false;
-            println!("header: {}", pre_dir.to_string() + separator + pre_name);
+            item.iter().for_each(|i| println!("{}/{}", i.dir, i.name));
         }
-        pre_dir = &i.dir;
-        pre_name = &i.name;
-    }
-    if flag_dup {
-        println!("header: {}", pre_dir.to_string() + separator + pre_name);
     }
 
-    pre_name = "";
-    pre_dir = "";
-    flag_dup = false;
-    let srcs = data.get_sources();
-    for s in srcs {
-        if pre_name == s.name {
+    flag_start = true;
+    for (_, group) in &data.get_sources().iter().group_by(|&x| &x.name) {
+        let item: Vec<_> = group.collect();
+        if item.len() > 1 {
             if flag_start {
                 flag_start = false;
-                println!("duplicate files:");
+                println!("\r\nduplicate files:");
             }
-            println!("src: {}", pre_dir.to_string() + separator + pre_name);
-            flag_dup = true;
-        } else if flag_dup {
-            flag_dup = false;
-            println!("src: {}", pre_dir.to_string() + separator + pre_name);
+            item.iter().for_each(|s| println!("{}/{}", s.dir, s.name));
         }
-        pre_dir = &s.dir;
-        pre_name = &s.name;
-    }
-    if flag_dup {
-        println!("src: {}", pre_dir.to_string() + separator + pre_name);
     }
 }
